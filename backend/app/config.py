@@ -1,3 +1,3 @@
-DATA_PATH = 'data/raw'
+DATA_PATH = "data/raw"
 
-
+MODEL_PATH = "models"

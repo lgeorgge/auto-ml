@@ -1,41 +1,58 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
 import os
-import pandas as pd
+from app.services.data_services import load_data
+from app.config import DATA_PATH
 
 router = APIRouter()
 
-UPLOAD_DIR = "data/raw"
+
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
 
-    file_string_path = file.filename
-    
-    if not file_string_path:
-        raise HTTPException(status_code=400, detail="Uploaded file must include a filename")
+    file_name = file.filename
 
-    file_string_path = os.path.basename(file_string_path)
-    file_path = os.path.join(UPLOAD_DIR,file_string_path)
+    if not file_name:
+        raise HTTPException(
+            status_code=400, detail="Uploaded file must include a filename"
+        )
 
+    file_name = os.path.basename(file_name)
+    file_path = os.path.join(DATA_PATH, file_name)
 
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
 
     sample_data = None
+    file_columns = None
 
-    if file:
-        print(file.filename)
-        print(file.size)
-        print(file.headers)
+    data = load_data(file_path)
 
-    if file.filename and file.filename.endswith(".csv"):
-        data = pd.read_csv(file_path)
-        sample_data = data.head(5)
-    else: 
-        data = pd.read_excel(file.file)
-        sample_data = data.head(5)
+    sample_data = data.head(5).to_dict(orient="records")
+    file_columns = data.columns.to_list()
 
-    return {"filename": file.filename, "message": "File uploaded successfully",
-            "headRows" : sample_data }
+    return {
+        "message": "File uploaded successfully",
+        "filename": file.filename,
+        "columns" : file_columns,
+        "headRows": sample_data,
+    }
+
+# Route for getting Names
+@router.get('/upload/get-files')
+async def get_upoads():
+    if not os.path.isdir(DATA_PATH):
+        raise HTTPException(
+            status_code=404, detail=f"Raw data directory not found"
+        )
+
+    file_names = sorted(
+        [
+            entry
+            for entry in os.listdir(DATA_PATH)
+            if os.path.isfile(os.path.join(DATA_PATH, entry))
+        ]
+    )
+
+    return {"files": file_names}

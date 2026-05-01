@@ -1,5 +1,6 @@
-from sklearn.linear_model import LogisticRegression,LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans
 
 
 def get_classification_models():
@@ -14,3 +15,10 @@ def get_regression_models():
         'linear_regression' : LinearRegression()
 
     }
+    
+def get_cluster_model():
+    return{
+        'KMeans_Clustering' : KMeans()
+
+    }
+    

@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from app.services.data_services import load_data
 from app.ml.preprocessor import build_preprocessor
-from app.ml.models import get_classification_models
+from app.ml.models import get_classification_models, get_cluster_model, get_regression_models
 from app.ml.evaluation import evaluate_classification
 from app.config import MODEL_PATH
 
@@ -69,9 +69,18 @@ def train_model(
                     best_pipeline = pipeline
                     best_model_name = name
 
-            os.makedirs(MODEL_PATH, exist_ok=True)
+            # updating the best model path to express the type of task
+            task_dir = os.path.join(MODEL_PATH, task_type.upper())
+            os.makedirs(task_dir, exist_ok=True)
 
-            model_path = os.path.join(MODEL_PATH, f"{best_model_name}.joblib")
+            # Delete any existing model files in this directory first to make sure in the predict we are hitting the right model for the current task(bad design bas hanmashy 7alna!)
+            for existing_file in os.listdir(task_dir):
+                if existing_file.endswith(".joblib"):
+                    existing_path = os.path.join(task_dir, existing_file)
+                    if os.path.exists(existing_path):
+                        os.remove(existing_path)
+
+            model_path = os.path.join(task_dir, f"{best_model_name}.joblib")
             joblib.dump(best_pipeline, model_path)
 
             return {
@@ -94,3 +103,12 @@ def train_model(
     except Exception as ex:
         print(str(ex))
         raise ex
+
+def train_regression():
+    model = get_regression_models()
+    # ...continue ya wagdy!
+    
+def cluster_fit():
+    model = get_cluster_model()
+    # ...continue ya wagdy!
+    

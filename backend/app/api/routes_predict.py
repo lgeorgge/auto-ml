@@ -10,7 +10,6 @@ from fastapi import APIRouter, HTTPException
 from app.config import MODEL_PATH
 import os
 import joblib
-from app.services.training_services import cluster_fit
 import pandas as pd
 
 
@@ -82,13 +81,36 @@ def predict_regression(payload: dict):
         raise HTTPException(status_code=400, detail=f"Prediction failed: {str(e)}")
 
 @router.post("/cluster")
-def cluster():
+def predict_cluster(payload: dict):
+    model_dir_path = os.path.join(MODEL_PATH, "CLUSTERING")
+
+    if not os.path.isdir(model_dir_path):
+        raise HTTPException(status_code=404, detail="CLUSTERING model directory not found")
+
+    model_files = [f for f in os.listdir(model_dir_path) if f.endswith(".joblib")]
+    if not model_files:
+        raise HTTPException(status_code=404, detail="No CLUSTERING model found")
+
+    model_path = os.path.join(model_dir_path, model_files[0])
+
     try:
-        labels = cluster_fit()
-        return {"prediction labels": labels.tolist() if hasattr(labels, "tolist") else labels}
+        clusterer = joblib.load(model_path)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Clustering failed: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+
+    features = payload.get("features", payload)
+
+    if isinstance(features, dict):
+        features_df = pd.DataFrame([features])
+    elif isinstance(features, list) and len(features) > 0 and isinstance(features[0], dict):
+        features_df = pd.DataFrame(features)
+
+    try:
+        prediction = clusterer.predict(features_df)
+        return {"prediction": prediction.tolist() if hasattr(prediction, "tolist") else prediction}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Clustering prediction failed: {str(e)}")
+
 
 
 

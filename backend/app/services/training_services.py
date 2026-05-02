@@ -31,6 +31,9 @@ def train_model(
             if target_variable not in df.columns:
                 return {"error": "Target column not found in dataset"}
 
+            # Drop rows where target variable is missing
+            df = df.dropna(subset=[target_variable])
+
             X = df.drop(columns=[target_variable])
             y = df[target_variable]
 
@@ -89,111 +92,108 @@ def train_model(
                 "best_model": best_model_name,
             }
 
-        else:
+        elif task_type.upper() == "REGRESSION":
+            if target_variable is None:
+                raise ValueError("Target variable is required when using regression")
 
-            preprocessor = build_preprocessor(df)
+            if target_variable not in df.columns:
+                return {"error": "Target column not found in dataset"}
 
-            X_processed = preprocessor.fit_transform(df)
+            # Drop rows where target variable is missing
+            df = df.dropna(subset=[target_variable])
 
+            #split data
+            x=df.drop(columns=[target_variable])
+            y=df[target_variable]
+            x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.2,random_state=42)
+            #get models
+            models = get_regression_models()
+            results = {}
+            best_score = float('inf')  # For regression, lower is better (e.g., MSE)
+            best_pipeline = None
+            best_model_name = ""
+            for name, model in models.items():
+                print("started with model : ", name)
+                # Build fresh preprocessor each time
+                preprocessor = build_preprocessor(x_train)
+                pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', model)])
+                pipeline.fit(x_train, y_train)
+                y_pred = pipeline.predict(x_test)
+                metrics = evaluate_regression(y_test, y_pred)
+                results[name] = metrics
+                if metrics["mse"] < best_score:
+                    best_score = metrics["mse"]
+                    best_pipeline = pipeline
+                    best_model_name = name
+            # Save the best model
+            task_dir = os.path.join(MODEL_PATH, "REGRESSION")
+            os.makedirs(task_dir, exist_ok=True)
+            for existing_file in os.listdir(task_dir):
+                if existing_file.endswith(".joblib"):
+                    existing_path = os.path.join(task_dir, existing_file)
+                    if os.path.exists(existing_path):
+                        os.remove(existing_path)
+            model_path = os.path.join(task_dir, f"{best_model_name}.joblib")
+            joblib.dump(best_pipeline, model_path)
             return {
-                "message": "Preprocessing completed",
-                "original_shape": df.shape,
-                "processed_shape": X_processed.shape,
+                "message": "Training completed",
+                "results": results,
+                "best_model": best_model_name,
             }
+        elif task_type.upper() == "CLUSTERING":
+            #get models
+            models = get_cluster_model()
+            results = {}
+            best_score = float('-inf')  # For clustering, higher silhouette score is better
+            best_pipeline = None
+            best_model_name = ""
+
+            # Loop through each clustering model, build a pipeline, fit it, and evaluate using silhouette score
+            for name, model in models.items():
+                print("started with model : ", name)
+                # Build fresh preprocessor each time
+                preprocessor = build_preprocessor(df)
+                pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', model)])
+                
+                # Fit the pipeline and predict labels in one step
+                cluster_labels = pipeline.fit_predict(df)
+                
+                # Transform the data using just the preprocessor for evaluation metrics
+                x_processed = preprocessor.transform(df)
+                
+                metrics = evaluate_clustering(x_processed, cluster_labels)
+                silhouette_avg = metrics["silhouette_score"]
+                results[name] = metrics
+                if silhouette_avg > best_score:
+                    best_score = silhouette_avg
+                    best_pipeline = pipeline
+                    best_model_name = name
+
+
+            
+            # Save the best model
+            task_dir = os.path.join(MODEL_PATH, "CLUSTERING")
+            os.makedirs(task_dir, exist_ok=True)
+            for existing_file in os.listdir(task_dir):
+                if existing_file.endswith(".joblib"):
+                    existing_path = os.path.join(task_dir, existing_file)
+                    if os.path.exists(existing_path):
+                        os.remove(existing_path)
+            model_path = os.path.join(task_dir, f"{best_model_name}.joblib")
+            joblib.dump(best_pipeline, model_path)
+            return {
+                "message": "Clustering completed",
+                "results": results,
+                "best_model": best_model_name,
+            }
+        else:
+            return {"error": "Invalid task type"}
+
     except Exception as ex:
         print(str(ex))
         raise ex
 
-def train_regression(file_name: str, target_variable: str):
-    #load data
-    df = load_data(file_name)
-    #cleaning data
-    df = df.drop(columns=[col for col in df.columns if "id" in col.lower()])
-    #split data
-    x=df.drop(columns=[target_variable])
-    y=df[target_variable]
-    x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.2,random_state=42)
-    #get models
-    models = get_regression_models()
-    results = {}
-    best_score = float('inf')  # For regression, lower is better (e.g., MSE)
-    best_pipeline = None
-    best_model_name = ""
-    for name, model in models.items():
-        print("started with model : ", name)
-        # Build fresh preprocessor each time
-        preprocessor = build_preprocessor(x_train)
-        pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', model)])
-        pipeline.fit(x_train, y_train)
-        y_pred = pipeline.predict(x_test)
-        metrics = evaluate_regression(y_test, y_pred)
-        results[name] = metrics
-        if metrics["mse"] < best_score:
-            best_score = metrics["mse"]
-            best_pipeline = pipeline
-            best_model_name = name
-    # Save the best model
-    task_dir = os.path.join(MODEL_PATH, "REGRESSION")
-    os.makedirs(task_dir, exist_ok=True)
-    for existing_file in os.listdir(task_dir):
-        if existing_file.endswith(".joblib"):
-            existing_path = os.path.join(task_dir, existing_file)
-            if os.path.exists(existing_path):
-                os.remove(existing_path)
-    model_path = os.path.join(task_dir, f"{best_model_name}.joblib")
-    joblib.dump(best_pipeline, model_path)
-    return {
-        "message": "Training completed",
-        "results": results,
-        "best_model": best_model_name,
-    }
     
-def cluster_fit(file_name: str):
-    #load data
-    df = load_data(file_name)
-
-    
-    #cleaning data
-    df = df.drop(columns=[col for col in df.columns if "id" in col.lower()])
-
-
-    #get models
-    models = get_cluster_model()
-    results = {}
-    best_score = float('-inf')  # For clustering, higher silhouette score is better
-    best_pipeline = None
-    best_model_name = ""
-
-    # Loop through each clustering model, build a pipeline, fit it, and evaluate using silhouette score
-    for name, model in models.items():
-        print("started with model : ", name)
-        # Build fresh preprocessor each time
-        preprocessor = build_preprocessor(df)
-        pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', model)])
-        x_processed = pipeline.fit_transform(df)
-        cluster_labels = pipeline.fit_predict(x_processed)
-        metrics = evaluate_clustering(x_processed, cluster_labels)
-        silhouette_avg = metrics["silhouette_score"]
-        results[name] = metrics
-        if silhouette_avg > best_score:
-            best_score = silhouette_avg
-            best_pipeline = pipeline
-            best_model_name = name
 
 
     
-    # Save the best model
-    task_dir = os.path.join(MODEL_PATH, "CLUSTERING")
-    os.makedirs(task_dir, exist_ok=True)
-    for existing_file in os.listdir(task_dir):
-        if existing_file.endswith(".joblib"):
-            existing_path = os.path.join(task_dir, existing_file)
-            if os.path.exists(existing_path):
-                os.remove(existing_path)
-    model_path = os.path.join(task_dir, f"{best_model_name}.joblib")
-    joblib.dump(best_pipeline, model_path)
-    return {
-        "message": "Clustering completed",
-        "results": results,
-        "best_model": best_model_name,
-    }

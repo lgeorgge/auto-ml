@@ -6,9 +6,9 @@ def load_data(file_name: str):
     df : pd.DataFrame
     file_path = os.path.join(DATA_PATH,os.path.basename(file_name))
     if file_path.endswith('.csv'):
-        df =  pd.read_csv(file_path)
+        df =  pd.read_csv(file_path, na_values=['?'])
     elif file_path.endswith('xlsx'):
-        df =  pd.read_excel(file_path)
+        df =  pd.read_excel(file_path, na_values=['?'])
     else:
         raise ValueError("Unsupported file format")
     

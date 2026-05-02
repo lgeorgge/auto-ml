@@ -1,6 +1,6 @@
 from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.cluster import KMeans, AgglomerativeClustering
 
 
 def get_classification_models():
@@ -12,13 +12,16 @@ def get_classification_models():
 
 def get_regression_models():
     return{
-        'linear_regression' : LinearRegression()
+        'linear_regression' : LinearRegression(),
+        "random_forest" : RandomForestRegressor()
 
     }
     
 def get_cluster_model():
     return{
-        'KMeans_Clustering' : KMeans()
+        'KMeans_Clustering' : KMeans(),
+        'Agglomerative Clustering' : AgglomerativeClustering()
 
     }
     
+
